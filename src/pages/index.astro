@@ -1,0 +1,64 @@
+---
+import { getTwitchSchedule } from '../api/Twitch';
+import type { TwitchScheduleResponse, ScheduleData, Segment } from '../types/twitchTypes';
+
+const broadcasterId = import.meta.env.TWITCH_BROADCASTER_ID;
+
+let schedule: ScheduleData | null = null;
+
+try {
+  const scheduleResponse: TwitchScheduleResponse = await getTwitchSchedule(broadcasterId);
+  if (scheduleResponse.data) {
+    schedule = scheduleResponse.data;
+  }
+} catch (error) {
+  console.error('Error fetching Twitch schedule:', error);
+}
+---
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Schedule for: {schedule?.broadcaster_name || 'Unknown Broadcaster'}</title>
+</head>
+<body>
+
+  {broadcasterId}
+  <h1>Schedule for: {schedule?.broadcaster_name || 'Unknown Broadcaster'}</h1>
+  {schedule ? (
+    <div>
+      <h2>General Information:</h2>
+      <p>ID: {schedule.broadcaster_id}</p>
+      <p>Login: {schedule.broadcaster_login}</p>
+      <p>Type: {schedule.vacation ? 'On Vacation' : 'Active'}</p>
+      {schedule.vacation && (
+        <>
+          <h3>Vacation Info:</h3>
+          <p>Start: {new Date(schedule.vacation.start_time).toLocaleString()}</p>
+          <p>End: {new Date(schedule.vacation.end_time).toLocaleString()}</p>
+        </>
+      )}
+
+      <h2>Schedule:</h2>
+      <ul>
+        {schedule.segments.map((segment: Segment) => (
+          <li>
+            <p>Title: {segment.title}</p>
+            <p>Start Time: {new Date(segment.start_time).toLocaleString()}</p>
+            <p>End Time: {new Date(segment.end_time).toLocaleString()}</p>
+            <p>Category: {segment.category.name}</p>
+            <p>Is Recurring: {segment.is_recurring ? 'Yes' : 'No'}</p>
+            {segment.canceled_until && (
+              <p>Canceled Until: {new Date(segment.canceled_until).toLocaleString()}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : (
+    <p>No schedule available.</p>
+  )}
+</body>
+</html>
