@@ -1,16 +1,24 @@
 ---
-import { getTwitchSchedule } from '../api/Twitch';
-import type { TwitchScheduleResponse, ScheduleData, Segment } from '../types/twitchTypes';
+import { getTwitchSchedule, getTwitchCategories } from '../api/Twitch';
+import type { TwitchScheduleResponse,TwitchCategoriesResponse, ScheduleData, Segment, Category } from '../types/twitchTypes';
 
 const broadcasterId = import.meta.env.TWITCH_BROADCASTER_ID;
 
 let schedule: ScheduleData | null = null;
+let categories: Category[] | null = null;
 
 try {
   const scheduleResponse: TwitchScheduleResponse = await getTwitchSchedule(broadcasterId);
   if (scheduleResponse.data) {
     schedule = scheduleResponse.data;
+    
+    const categoriesResponse: TwitchCategoriesResponse = await getTwitchCategories(schedule.segments.map(segment => segment.category.id));
+    
+    if (categoriesResponse.data) {
+      categories = categoriesResponse.data;
+    }
   }
+ 
 } catch (error) {
   console.error('Error fetching Twitch schedule:', error);
 }
@@ -24,8 +32,6 @@ try {
   <title>Schedule for: {schedule?.broadcaster_name || 'Unknown Broadcaster'}</title>
 </head>
 <body>
-
-  {broadcasterId}
   <h1>Schedule for: {schedule?.broadcaster_name || 'Unknown Broadcaster'}</h1>
   {schedule ? (
     <div>
@@ -43,18 +49,27 @@ try {
 
       <h2>Schedule:</h2>
       <ul>
-        {schedule.segments.map((segment: Segment) => (
-          <li>
-            <p>Title: {segment.title}</p>
-            <p>Start Time: {new Date(segment.start_time).toLocaleString()}</p>
-            <p>End Time: {new Date(segment.end_time).toLocaleString()}</p>
-            <p>Category: {segment.category.name}</p>
-            <p>Is Recurring: {segment.is_recurring ? 'Yes' : 'No'}</p>
-            {segment.canceled_until && (
-              <p>Canceled Until: {new Date(segment.canceled_until).toLocaleString()}</p>
-            )}
-          </li>
-        ))}
+        {schedule.segments.map((segment: Segment) => {
+          const category = categories?.find(cat => cat.id === segment.category.id);
+          return (
+            <li>
+              <p>Title: {segment.title}</p>
+              <p>Start Time: {new Date(segment.start_time).toLocaleString()}</p>
+              <p>End Time: {new Date(segment.end_time).toLocaleString()}</p>
+              {category && (
+                <div>
+                  <p>Category ID: {category.id}</p>
+                  <p>Category Name: {category.name}</p>
+                  <img src={category.box_art_url} alt={`Box art for ${category.name}`} />
+                </div>
+              )}
+              <p>Is Recurring: {segment.is_recurring ? 'Yes' : 'No'}</p>
+              {segment.canceled_until && (
+                <p>Canceled Until: {new Date(segment.canceled_until).toLocaleString()}</p>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   ) : (

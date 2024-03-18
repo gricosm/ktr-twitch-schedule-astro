@@ -1,8 +1,8 @@
 import type {
-  TwitchGamesResponse,
   TwitchTokenResponse,
   TwitchBroadcasterResponse,
   TwitchScheduleResponse,
+  TwitchCategoriesResponse,
 } from "../types/twitchTypes";
 
 /**
@@ -84,22 +84,25 @@ export const getTwitchSchedule = async (
 };
 
 /**
- * Fetches information about one or more games from the Twitch API.
- * @param gameIds An array of game IDs to fetch information for.
- * @returns {Promise<TwitchGamesResponse>} A promise that resolves to the games information.
+ * Fetches information about one or more categories from the Twitch API.
+ * @param categoriesIds An array of categories IDs to fetch information for.
+ * @returns {Promise<TwitchCategoriesResponse>} A promise that resolves to the categories information.
  */
-export const getTwitchGames = async (
-  gameIds: string[]
-): Promise<TwitchGamesResponse> => {
+export const getTwitchCategories = async (
+  categoriesIds: string[]
+): Promise<TwitchCategoriesResponse> => {
   const headers = await getAuthHeaders();
   const params = new URLSearchParams();
-  gameIds.forEach((id) => params.append("id", id));
+  categoriesIds.forEach((id) => params.append("id", id));
 
-  const response = await fetch(`https://api.twitch.tv/helix/games?${params}`, {
-    headers,
-  });
+  const response = await fetch(
+    `https://api.twitch.tv/helix/categories?${params}`,
+    {
+      headers,
+    }
+  );
   if (!response.ok) {
-    throw new Error(`Error fetching games: ${response.statusText}`);
+    throw new Error(`Error fetching categories: ${response.statusText}`);
   }
 
   return await response.json();

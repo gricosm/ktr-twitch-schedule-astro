@@ -29,7 +29,7 @@ export interface Broadcaster {
 
 export type TwitchBroadcasterResponse = TwitchApiResponse<Broadcaster>;
 
-export interface Category {
+export interface ScheduleCategory {
   id: string;
   name: string;
 }
@@ -40,7 +40,7 @@ export interface Segment {
   end_time: Date;
   title: string;
   canceled_until: null;
-  category: Category;
+  category: ScheduleCategory;
   is_recurring: boolean;
 }
 
@@ -62,10 +62,10 @@ export type TwitchScheduleResponse = {
   pagination: Pagination;
 };
 
-export interface Game {
+export interface Category {
   id: string;
   name: string;
   box_art_url: string;
 }
 
-export type TwitchGamesResponse = TwitchApiResponse<Game>;
+export type TwitchCategoriesResponse = TwitchApiResponse<Category>;
