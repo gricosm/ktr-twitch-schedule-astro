@@ -7,7 +7,8 @@
       "@core/*": ["src/components/core/*"],
       "@assets/*": ["src/assets/*"],
       "@types/*": ["src/types/*"],
-      "@api/*": ["src/api/*"]
+      "@api/*": ["src/api/*"],
+      "@utils/*": ["src/utils/*"]
     }
   }
 }

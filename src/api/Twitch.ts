@@ -1,8 +1,10 @@
+import { replaceImageSize } from "@utils/Image";
 import type {
   TwitchTokenResponse,
   TwitchBroadcasterResponse,
   TwitchScheduleResponse,
   TwitchCategoriesResponse,
+  Category,
 } from "../types/twitchTypes";
 
 /**
@@ -84,26 +86,39 @@ export const getTwitchSchedule = async (
 };
 
 /**
- * Fetches information about one or more categories from the Twitch API.
- * @param categoriesIds An array of categories IDs to fetch information for.
- * @returns {Promise<TwitchCategoriesResponse>} A promise that resolves to the categories information.
+ * Fetches information about specified Twitch categories and adjusts the size of their box art images.
+ * This function makes an API call to Twitch's `helix/games` endpoint to retrieve information about the given categories.
+ * It then processes the response to replace the `{width}` and `{height}` placeholders in the box art URL with the specified values.
+ *
+ * @param {string[]} categoriesIds - An array of category IDs for which information is to be fetched.
+ * @param {number} width - The desired width for the box art images.
+ * @param {number} height - The desired height for the box art images.
+ * @returns {Promise<Category[]>} A promise that resolves to an array of category objects with the box art URLs adjusted to the specified size.
+ *
+ * Each object in the returned array represents a category, including all original information plus the modified box art URL.
  */
 export const getTwitchCategories = async (
-  categoriesIds: string[]
+  categoriesIds: string[],
+  width: number,
+  height: number
 ): Promise<TwitchCategoriesResponse> => {
   const headers = await getAuthHeaders();
   const params = new URLSearchParams();
   categoriesIds.forEach((id) => params.append("id", id));
 
-  const response = await fetch(
-    `https://api.twitch.tv/helix/categories?${params}`,
-    {
-      headers,
-    }
-  );
+  const response = await fetch(`https://api.twitch.tv/helix/games?${params}`, {
+    headers,
+  });
   if (!response.ok) {
     throw new Error(`Error fetching categories: ${response.statusText}`);
   }
 
-  return await response.json();
+  const categories = await response.json();
+
+  const processedCategories = categories.data.map((category: Category) => ({
+    ...category,
+    box_art_url: replaceImageSize(category.box_art_url, width, height),
+  }));
+
+  return { data: processedCategories };
 };

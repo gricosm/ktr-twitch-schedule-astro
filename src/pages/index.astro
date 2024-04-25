@@ -9,12 +9,11 @@ let categories: Category[] | null = null;
 
 try {
   const scheduleResponse: TwitchScheduleResponse = await getTwitchSchedule(broadcasterId);
+
   if (scheduleResponse.data) {
     schedule = scheduleResponse.data;
-    
-    const categoriesResponse: TwitchCategoriesResponse = await getTwitchCategories(schedule.segments.map(segment => segment.category.id));
-    
-    if (categoriesResponse.data) {
+    const categoriesResponse: TwitchCategoriesResponse = await getTwitchCategories(schedule.segments.map(segment => segment.category.id), 432, 650);
+    if (categoriesResponse) {
       categories = categoriesResponse.data;
     }
   }
@@ -46,34 +45,38 @@ try {
           <p>End: {new Date(schedule.vacation.end_time).toLocaleString()}</p>
         </>
       )}
-
       <h2>Schedule:</h2>
-      <ul>
-        {schedule.segments.map((segment: Segment) => {
-          const category = categories?.find(cat => cat.id === segment.category.id);
-          return (
-            <li>
-              <p>Title: {segment.title}</p>
-              <p>Start Time: {new Date(segment.start_time).toLocaleString()}</p>
-              <p>End Time: {new Date(segment.end_time).toLocaleString()}</p>
-              {category && (
-                <div>
-                  <p>Category ID: {category.id}</p>
-                  <p>Category Name: {category.name}</p>
-                  <img src={category.box_art_url} alt={`Box art for ${category.name}`} />
-                </div>
-              )}
-              <p>Is Recurring: {segment.is_recurring ? 'Yes' : 'No'}</p>
-              {segment.canceled_until && (
-                <p>Canceled Until: {new Date(segment.canceled_until).toLocaleString()}</p>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+
+      <section class="calendar-container">
+        <div class="block-cards-twitch" >
+          {schedule.segments.map((segment: Segment) => {
+            const category = categories?.find(cat => cat.id === segment.category.id);
+
+            return (
+              <article style={`background-image: url(${category?.box_art_url}); background-position: center;`}>
+                <h3>{segment.title}</h3>
+                <h3>{category?.name}</h3>
+                <p>Start Time: {new Date(segment.start_time).toLocaleString()}</p>
+                <p>End Time: {new Date(segment.end_time).toLocaleString()}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </div>
   ) : (
     <p>No schedule available.</p>
   )}
 </body>
 </html>
+
+<style>
+
+  .calendar-container {
+    width: 100dvw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+</style>
