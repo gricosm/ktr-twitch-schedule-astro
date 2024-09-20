@@ -12,6 +12,8 @@
   <section id="schedule-container">Loading...</section>
 
   <script>
+    import type { Segment, Category } from "../types/twitchTypes";
+
     const removeAccents = (str: string): string => {
       return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }
@@ -34,14 +36,14 @@
 
         const { schedule, categories } = data;
 
-        if (schedule && schedule.segments.length > 0) {
+        if (schedule && schedule.segments.length > 0 && scheduleContainer !== null ) {
           scheduleContainer.innerHTML = `
             <section
               id="schedule"
               class="w-[1024px] h-[450px] grid grid-cols-5 gap-2 transition-all duration-400"
             >
-              ${schedule.segments.slice(0, 5).map((segment, index) => {
-                const category = categories.find(cat => cat.id === segment.category.id);
+              ${schedule.segments.slice(0, 5).map((segment: Segment, index: number) => {
+                const category = categories.find((cat: Category) => cat.id === segment.category.id);
                 return `
                   <article 
                     id="segment-${index}"
@@ -84,10 +86,11 @@
             </section>
           `;
         } else {
-          scheduleContainer.innerHTML = '<p>No schedule available.</p>';
+          if (scheduleContainer !== null) {
+            scheduleContainer.innerHTML = '<p>No schedule available.</p>';
+          }
         }
 
-        // Lógica de selección automática de segmentos
         let currentIndex = 0;
 
         function updateSegment() {
@@ -108,9 +111,16 @@
         setInterval(updateSegment, 7500);
 
       } catch (error) {
-        scheduleContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
-        console.error('Error fetching Twitch data:', error);
-      }
+          if (error instanceof Error) {
+            if (scheduleContainer !== null) {
+              scheduleContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
+            } 
+          } else {
+            if (scheduleContainer !== null) {
+              scheduleContainer.innerHTML = `<p>Error loading data</p>`;
+            }
+          }
+        }
     });
   </script>
 
