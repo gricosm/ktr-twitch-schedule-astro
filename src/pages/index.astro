@@ -1,126 +1,122 @@
----
-import { getTwitchSchedule, getTwitchCategories } from '../api/Twitch';
-import type { TwitchScheduleResponse,TwitchCategoriesResponse, ScheduleData, Segment, Category } from '../types/twitchTypes';
-
-const broadcasterId = import.meta.env.TWITCH_BROADCASTER_ID;
-
-let schedule: ScheduleData | null = null;
-let categories: Category[] | null = null;
-
-try {
-  const scheduleResponse: TwitchScheduleResponse = await getTwitchSchedule(broadcasterId);
- 
-  if (scheduleResponse.data) {
-    schedule = scheduleResponse.data;
-    const categoriesResponse: TwitchCategoriesResponse = await getTwitchCategories(schedule.segments.map(segment => segment.category.id), 432, 650);
-    if (categoriesResponse) {
-      categories = categoriesResponse.data;
-    }
-  }
- 
-} catch (error) {
-  console.error('Error fetching Twitch schedule:', error);
-}
-
-const removeAccents = (str: string): string => {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
----
-
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width" />
-  <title>Schedule for: {schedule?.broadcaster_name || 'Unknown Broadcaster'}</title>
+  <title>Schedule for Kill That Robot</title>
 </head>
 
 <body class="w-dvw h-dvh flex justify-center items-center">
-  {schedule ? (
-      <section
-        id="schedule"
-        class="w-[1024px] h-[450px] grid grid-cols-5 gap-2 transition-all duration-400"
-      >
-        {schedule.segments.slice(0, 5).map((segment: Segment, index: number) => {
-          const category = categories?.find(cat => cat.id === segment.category.id);
 
-          return (
-            <article 
-              id={`segment-${index}`}
-              class="w-[1024/5px] h-full border-[#ff9931] border-solid border-4 relative"
-              style={`background-image: url(${category?.box_art_url}); background-position: center;`
-            }>
-              <footer
-                id={`footer-${index}`}
-                class="bg-[#ff9931] text-white absolute bottom-0 p-3 flex flex-col justify-start gap-4"
-              >
-                <h3 class="m-0 p-0 leading-[0.8] font-dinpro-bold">{segment.title}</h3>
+  <section id="schedule-container">Loading...</section>
 
-                <h4 class="m-0 p-0 leading-[0.8] font-dinpro-medium">{category?.name}</h4>
-
-                <div 
-                  class="w-full flex flex-row items-end mr-[-2px]"
-                  style="margin-left: -4px;"
-                >
-                  <p 
-                    id={`weekday-${index}`}
-                    class="m-0 p-0 leading-[0.8] font-dinpro-bold text-[3.5rem]"
-                    >{removeAccents(new Date(segment.start_time).toLocaleString('es-ES', {
-                        weekday: 'long',
-                      }).toUpperCase().replace(/,/g, ''))
-                    }
-                  </p>
-                  
-                  <div class="m-0 p-0 flex flex-col space-y-0">
-                    <p class="m-0 p-0 leading-none font-dinpro-medium">
-                      {new Date(segment.start_time).toLocaleString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false,
-                      }).toUpperCase().replace(/,/g, '')
-                      }
-                    </p>
-                    <p class="m-0 p-0 leading-none font-dinpro-bold text-[28px]">
-                      {new Date(segment.start_time).toLocaleString('de', {
-                        day: "2-digit",
-                        month: "2-digit",
-                        hour12: false,
-                      }).toUpperCase().replace(/,/g, '')
-                      }
-                    </p>
-                  </div>
-
-                </div>
-              </footer>
-            </article>
-          );
-        })}
-      </section>
-  ) : (
-    <p>No schedule available.</p>
-  )}
-<script>
-  let currentIndex = 0;
-
-  function updateSegment() {
-    const segments = document.querySelectorAll('#schedule article');
-
-    segments.forEach((segment, index) => {
-      segment.classList.remove('selected');
-    });
-
-    if (segments[currentIndex]) {
-      segments[currentIndex].classList.add('selected');
+  <script>
+    const removeAccents = (str: string): string => {
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     }
 
-    currentIndex = (currentIndex + 1) % segments.length;
-  }
+    document.addEventListener('DOMContentLoaded', async () => {
+      const scheduleContainer = document.getElementById('schedule-container');
+      
+      try {
+        const response = await fetch('/api/twitch-data');
 
-  updateSegment();
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
 
-  setInterval(updateSegment, 7500);
-</script>
-</body>
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        const { schedule, categories } = data;
+
+        if (schedule && schedule.segments.length > 0) {
+          scheduleContainer.innerHTML = `
+            <section
+              id="schedule"
+              class="w-[1024px] h-[450px] grid grid-cols-5 gap-2 transition-all duration-400"
+            >
+              ${schedule.segments.slice(0, 5).map((segment, index) => {
+                const category = categories.find(cat => cat.id === segment.category.id);
+                return `
+                  <article 
+                    id="segment-${index}"
+                    class="w-[1024/5px] h-full border-[#ff9931] border-solid border-4 relative"
+                    style="background-image: url(${category?.box_art_url}); background-position: center;"
+                  >
+                    <footer
+                      id="footer-${index}"
+                      class="bg-[#ff9931] text-white absolute bottom-0 p-3 flex flex-col justify-start gap-4"
+                    >
+                      <h1 class="m-0 p-0 leading-[0.8] font-dinpro-bold">${segment.title}</h1>
+                      <h2 class="m-0 p-0 leading-[0.8] font-dinpro-medium">${category?.name}</h2>
+                      <div class="w-full flex flex-row items-end mr-[-2px]" style="margin-left: -4px;">
+                        <p id="weekday-${index}" class="m-0 p-0 leading-[0.8] font-dinpro-bold text-[3.5rem]">
+                          ${removeAccents(new Date(segment.start_time).toLocaleString('es-ES', {
+                            weekday: 'long',
+                          }).toUpperCase().replace(/,/g, ''))}
+                        </p>
+                        <div class="m-0 p-0 flex flex-col space-y-0">
+                          <p class="m-0 p-0 leading-none font-dinpro-medium">
+                            ${new Date(segment.start_time).toLocaleString('es-ES', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            }).toUpperCase().replace(/,/g, '')}
+                          </p>
+                          <p class="m-0 p-0 leading-none font-dinpro-bold text-[28px]">
+                            ${new Date(segment.start_time).toLocaleString('de', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour12: false,
+                            }).toUpperCase().replace(/,/g, '')}
+                          </p>
+                        </div>
+                      </div>
+                    </footer>
+                  </article>
+                `;
+              }).join('')}
+            </section>
+          `;
+        } else {
+          scheduleContainer.innerHTML = '<p>No schedule available.</p>';
+        }
+
+        // Lógica de selección automática de segmentos
+        let currentIndex = 0;
+
+        function updateSegment() {
+          const segments = document.querySelectorAll('#schedule article');
+          
+          segments.forEach((segment, index) => {
+            segment.classList.remove('selected');
+          });
+
+          if (segments[currentIndex]) {
+            segments[currentIndex].classList.add('selected');
+          }
+
+          currentIndex = (currentIndex + 1) % segments.length;
+        }
+
+        updateSegment();
+        setInterval(updateSegment, 7500);
+
+      } catch (error) {
+        scheduleContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
+        console.error('Error fetching Twitch data:', error);
+      }
+    });
+  </script>
+
+ 
+
+  </body>
 </html>
   
 <style>

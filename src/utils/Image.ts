@@ -9,7 +9,7 @@ export const replaceImageSize = (
   imageUrl: string,
   width: number,
   height: number
-) =>
+): string =>
   imageUrl
     .replace("{width}", width.toString())
     .replace("{height}", height.toString());
