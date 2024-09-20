@@ -52,7 +52,7 @@
                   >
                     <footer
                       id="footer-${index}"
-                      class="bg-[#ff9931] text-white absolute bottom-0 p-3 flex flex-col justify-start gap-4"
+                      class="bg-[#ff9931] text-white absolute bottom-0 p-3 flex flex-col justify-start gap-4 hidden"
                     >
                       <h1 class="m-0 p-0 leading-[0.8] font-dinpro-bold">${segment.title}</h1>
                       <h2 class="m-0 p-0 leading-[0.8] font-dinpro-medium">${category?.name}</h2>
@@ -85,30 +85,33 @@
               }).join('')}
             </section>
           `;
+
+          setTimeout(() => {
+            let currentIndex = 0;
+
+            function updateSegment() {
+              const segments = document.querySelectorAll('#schedule article');
+              
+              segments.forEach((segment, index) => {
+                segment.classList.remove('selected'); 
+              });
+
+              if (segments[currentIndex]) {
+                segments[currentIndex].classList.add('selected');
+              }
+
+              currentIndex = (currentIndex + 1) % segments.length; 
+            }
+
+            updateSegment();
+
+            setInterval(updateSegment, 7500);
+          }, 100);
         } else {
           if (scheduleContainer !== null) {
             scheduleContainer.innerHTML = '<p>No schedule available.</p>';
           }
         }
-
-        let currentIndex = 0;
-
-        function updateSegment() {
-          const segments = document.querySelectorAll('#schedule article');
-          
-          segments.forEach((segment, index) => {
-            segment.classList.remove('selected');
-          });
-
-          if (segments[currentIndex]) {
-            segments[currentIndex].classList.add('selected');
-          }
-
-          currentIndex = (currentIndex + 1) % segments.length;
-        }
-
-        updateSegment();
-        setInterval(updateSegment, 7500);
 
       } catch (error) {
           if (error instanceof Error) {
@@ -120,50 +123,44 @@
               scheduleContainer.innerHTML = `<p>Error loading data</p>`;
             }
           }
-        }
+      }
     });
   </script>
 
- 
-
   </body>
 </html>
-  
+
 <style>
-  article {
+  :global(article) {
     filter: grayscale(100%) opacity(24%);
     transition: transform 0.4s ease-in-out;
   }
 
-  article.selected {
+  :global(article.selected) {
     filter: none;
   }
 
-  article footer {
-    display: none;
-  }
-
-  article.selected footer {
+  :global(article.selected footer) {
     display: block;
   }
 
-  #schedule:has(#segment-0.selected) {
+  :global(#schedule:has(#segment-0.selected)) {
     grid-template-columns: 3fr 1fr 1fr 1fr 1fr;
   }
 
-   #schedule:has(#segment-1.selected) {
+  :global(#schedule:has(#segment-1.selected)) {
     grid-template-columns: 1fr 3fr 1fr 1fr 1fr;
   }
 
-  #schedule:has(#segment-2.selected) {
+  :global(#schedule:has(#segment-2.selected)) {
     grid-template-columns: 1fr 1fr 3fr 1fr 1fr;
   }
 
-  #schedule:has(#segment-3.selected) {
+  :global(#schedule:has(#segment-3.selected)) {
     grid-template-columns: 1fr 1fr 1fr 3fr 1fr;
   }
 
-  #schedule:has(#segment-4.selected) {
+  :global(#schedule:has(#segment-4.selected)) {
     grid-template-columns: 1fr 1fr 1fr 1fr 3fr;
   }
 </style>

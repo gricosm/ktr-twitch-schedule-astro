@@ -14,9 +14,9 @@ import type {
  * Fetches Twitch broadcaster schedule and related categories.
  * @returns {Promise<Response>} A promise that resolves to a Response object containing the broadcaster schedule and categories.
  */
-export async function get(): Promise<Response> {
+export async function GET(): Promise<Response> {
   try {
-    const broadcasterId = await getBroadcasterIdByName("nombre_del_canal");
+    const broadcasterId = await getBroadcasterIdByName("killthatrobot");
     if (!broadcasterId) {
       return new Response(JSON.stringify({ error: "No broadcaster found" }), {
         status: 404,
