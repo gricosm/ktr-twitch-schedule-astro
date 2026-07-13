@@ -8,18 +8,42 @@ import type {
   Category,
 } from "../types/twitchTypes";
 
+const TOKEN_URL = "https://id.twitch.tv/oauth2/token";
+const HELIX_URL = "https://api.twitch.tv/helix";
+
+/** Safety margin: renew the token 60s before it actually expires. */
+const EXPIRY_MARGIN_MS = 60_000;
+
+interface CachedToken {
+  accessToken: string;
+  expiresAt: number;
+}
+
 /**
- * Fetches a Twitch OAuth token.
- * @returns {Promise<string>} A promise that resolves with the OAuth token.
+ * In-memory token cache. It lives as long as the serverless instance does
+ * (on Vercel, across "warm" invocations). It is not persistent, and it does
+ * not need to be: worst case, we request a new token.
  */
-const fetchTwitchToken = async (): Promise<string> => {
+let cachedToken: CachedToken | null = null;
+
+/** In-flight token request, so N concurrent callers don't request N tokens. */
+let inFlight: Promise<string> | null = null;
+
+const isValid = (token: CachedToken | null): token is CachedToken =>
+  token !== null && Date.now() < token.expiresAt - EXPIRY_MARGIN_MS;
+
+/**
+ * Requests a fresh token from Twitch (client credentials flow).
+ * @returns {Promise<string>} The access token.
+ */
+const requestNewToken = async (): Promise<string> => {
   const params = new URLSearchParams({
     grant_type: "client_credentials",
     client_id: TWITCH_CLIENT_ID,
     client_secret: TWITCH_CLIENT_SECRET,
   });
 
-  const response = await fetch("https://id.twitch.tv/oauth2/token", {
+  const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
@@ -30,19 +54,62 @@ const fetchTwitchToken = async (): Promise<string> => {
   }
 
   const data: TwitchTokenResponse = await response.json();
+
+  cachedToken = {
+    accessToken: data.access_token,
+    // expires_in is returned in seconds.
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+
   return data.access_token;
 };
 
 /**
- * Generates authorization headers using a fetched Twitch token.
- * @returns {Promise<HeadersInit>} Headers including authorization and client ID.
+ * Returns a valid token, reusing the cached one while it is still good.
+ * @param force Bypass the cache and force a new token (used to retry after a 401).
+ * @returns {Promise<string>} A valid access token.
  */
-const getAuthHeaders = async (): Promise<HeadersInit> => {
-  const accessToken = await fetchTwitchToken();
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    "Client-Id": import.meta.env.TWITCH_CLIENT_ID,
-  };
+const getAccessToken = async (force = false): Promise<string> => {
+  if (!force && isValid(cachedToken)) {
+    return cachedToken.accessToken;
+  }
+
+  // If a request is already running, piggyback on it.
+  if (!force && inFlight) {
+    return inFlight;
+  }
+
+  inFlight = requestNewToken().finally(() => {
+    inFlight = null;
+  });
+
+  return inFlight;
+};
+
+/**
+ * Calls the Helix API using the cached token.
+ * If Twitch replies with a 401 (token revoked or expired early), it requests a
+ * new token and retries exactly once.
+ * @param path Helix-relative path, e.g. "/users?login=foo".
+ * @returns {Promise<Response>} The raw Helix response.
+ */
+const helixFetch = async (path: string): Promise<Response> => {
+  const call = async (token: string) =>
+    fetch(`${HELIX_URL}${path}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Client-Id": TWITCH_CLIENT_ID,
+      },
+    });
+
+  let response = await call(await getAccessToken());
+
+  if (response.status === 401) {
+    cachedToken = null;
+    response = await call(await getAccessToken(true));
+  }
+
+  return response;
 };
 
 /**
@@ -53,11 +120,10 @@ const getAuthHeaders = async (): Promise<HeadersInit> => {
 export const getBroadcasterIdByName = async (
   channelName: string
 ): Promise<string | null> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(
-    `https://api.twitch.tv/helix/users?login=${channelName}`,
-    { headers }
+  const response = await helixFetch(
+    `/users?login=${encodeURIComponent(channelName)}`
   );
+
   if (!response.ok) {
     throw new Error(`Error fetching broadcaster info: ${response.statusText}`);
   }
@@ -74,11 +140,8 @@ export const getBroadcasterIdByName = async (
 export const getTwitchSchedule = async (
   broadcasterId: string
 ): Promise<TwitchScheduleResponse> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(
-    `https://api.twitch.tv/helix/schedule?broadcaster_id=${broadcasterId}`,
-    { headers }
-  );
+  const response = await helixFetch(`/schedule?broadcaster_id=${broadcasterId}`);
+
   if (!response.ok) {
     throw new Error(`Error fetching schedule: ${response.statusText}`);
   }
@@ -87,29 +150,32 @@ export const getTwitchSchedule = async (
 };
 
 /**
- * Fetches information about specified Twitch categories and adjusts the size of their box art images.
- * This function makes an API call to Twitch's `helix/games` endpoint to retrieve information about the given categories.
- * It then processes the response to replace the `{width}` and `{height}` placeholders in the box art URL with the specified values.
+ * Fetches information about the given Twitch categories and resizes their box
+ * art images by replacing the {width} and {height} placeholders in the URL.
  *
- * @param {string[]} categoriesIds - An array of category IDs for which information is to be fetched.
- * @param {number} width - The desired width for the box art images.
- * @param {number} height - The desired height for the box art images.
- * @returns {Promise<Category[]>} A promise that resolves to an array of category objects with the box art URLs adjusted to the specified size.
- *
- * Each object in the returned array represents a category, including all original information plus the modified box art URL.
+ * @param categoriesIds Category IDs to fetch.
+ * @param width Desired box art width.
+ * @param height Desired box art height.
+ * @returns {Promise<TwitchCategoriesResponse>} Categories with resized box art URLs.
  */
 export const getTwitchCategories = async (
   categoriesIds: string[],
   width: number,
   height: number
 ): Promise<TwitchCategoriesResponse> => {
-  const headers = await getAuthHeaders();
-  const params = new URLSearchParams();
-  categoriesIds.forEach((id) => params.append("id", id));
+  // Helix returns a 400 when no id is supplied, so bail out before spending the call.
+  if (categoriesIds.length === 0) {
+    return { data: [] };
+  }
 
-  const response = await fetch(`https://api.twitch.tv/helix/games?${params}`, {
-    headers,
+  const params = new URLSearchParams();
+  // Twitch accepts at most 100 ids per request, and duplicates count towards it.
+  [...new Set(categoriesIds)].slice(0, 100).forEach((id) => {
+    params.append("id", id);
   });
+
+  const response = await helixFetch(`/games?${params}`);
+
   if (!response.ok) {
     throw new Error(`Error fetching categories: ${response.statusText}`);
   }

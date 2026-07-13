@@ -1,0 +1,44 @@
+/* Font faces were never declared: Tailwind asked for "DINPro-Bold" and the
+   browser only found it if it happened to be installed on the system.
+   The OBS browser process cannot be relied on for that. */
+
+@font-face {
+  font-family: "BlenderPro-Bold";
+  src: url("/fonts/BlenderPro-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "DINPro-Bold";
+  src: url("/fonts/DINPro-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "DINPro-Medium";
+  src: url("/fonts/DINPro-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-display: block;
+}
+
+/* Baseline for an OBS browser source: transparent background, no scrollbars,
+   no margins. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  /* Avoids the white flash on the first frame in CEF. */
+  background-color: rgba(0, 0, 0, 0);
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
