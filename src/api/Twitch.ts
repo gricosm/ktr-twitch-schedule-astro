@@ -1,3 +1,4 @@
+import { TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET } from "astro:env/server";
 import { replaceImageSize } from "@utils/Image";
 import type {
   TwitchTokenResponse,
@@ -13,12 +14,12 @@ import type {
  */
 const fetchTwitchToken = async (): Promise<string> => {
   const params = new URLSearchParams({
-    grant_type: import.meta.env.TWITCH_GRANT_TYPE,
-    client_id: import.meta.env.TWITCH_CLIENT_ID,
-    client_secret: import.meta.env.TWITCH_CLIENT_SECRET,
+    grant_type: "client_credentials",
+    client_id: TWITCH_CLIENT_ID,
+    client_secret: TWITCH_CLIENT_SECRET,
   });
 
-  const response = await fetch(import.meta.env.TWITCH_TOKEN_URL, {
+  const response = await fetch("https://id.twitch.tv/oauth2/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),
