@@ -1,166 +1,294 @@
-<html lang="en">
+---
+import {
+  getBroadcasterIdByName,
+  getTwitchSchedule,
+  getTwitchCategories,
+} from "../api/Twitch";
+import type { Segment, Category } from "../types/twitchTypes";
+import "../styles/global.css";
 
-<head>
-  <meta charset="utf-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width" />
-  <title>Schedule for Kill That Robot</title>
-</head>
+// Requiere adapter (@astrojs/vercel) + output: "server" en astro.config.mjs
+export const prerender = false;
 
-<body class="w-dvw h-dvh flex justify-center items-center">
+const CHANNEL = "killthatrobot";
+const TIME_ZONE = "Europe/Madrid";
+const MAX_SEGMENTS = 5;
 
-  <section id="schedule-container">Loading...</section>
+// Rotación de la tarjeta activa y refresco automático de la página.
+const ROTATE_MS = 7500;
+const RELOAD_MS = 15 * 60 * 1000;
 
-  <script>
-    import type { Segment, Category } from "../types/twitchTypes";
+interface Card {
+  title: string;
+  categoryName: string;
+  boxArt: string;
+  weekday: string;
+  time: string;
+  date: string;
+}
 
-    const removeAccents = (str: string): string => {
-      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const stripAccents = (str: string): string =>
+  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+// Node tiene ICU completo: formateamos aquí, no en el navegador de OBS.
+const fmt = (d: Date, opts: Intl.DateTimeFormatOptions, locale = "es-ES") =>
+  new Intl.DateTimeFormat(locale, { timeZone: TIME_ZONE, ...opts }).format(d);
+
+let cards: Card[] = [];
+let errorMessage = "";
+
+try {
+  const broadcasterId = await getBroadcasterIdByName(CHANNEL);
+  if (!broadcasterId) throw new Error("Canal no encontrado");
+
+  const scheduleResponse = await getTwitchSchedule(broadcasterId);
+  const segments: Segment[] = (scheduleResponse.data?.segments ?? []).slice(
+    0,
+    MAX_SEGMENTS,
+  );
+
+  if (segments.length > 0) {
+    const categoriesResponse = await getTwitchCategories(
+      segments.map((s) => s.category.id),
+      432,
+      650,
+    );
+    const categories: Category[] = categoriesResponse.data ?? [];
+
+    cards = segments.map((segment) => {
+      const category = categories.find((c) => c.id === segment.category.id);
+      const start = new Date(segment.start_time);
+
+      return {
+        title: segment.title,
+        categoryName: category?.name ?? "",
+        boxArt: category?.box_art_url ?? "",
+        weekday: stripAccents(fmt(start, { weekday: "long" }).toUpperCase()),
+        time: fmt(start, { hour: "2-digit", minute: "2-digit", hour12: false }),
+        date: fmt(start, { day: "2-digit", month: "2-digit" }, "de-DE"),
+      };
+    });
+  }
+} catch (error) {
+  errorMessage =
+    error instanceof Error ? error.message : "Error cargando el calendario";
+  console.error("[schedule]", error);
+}
+
+// No cachear los fallos: si Twitch peta, no lo dejamos congelado en el CDN.
+Astro.response.headers.set(
+  "Cache-Control",
+  cards.length > 0
+    ? "public, s-maxage=300, stale-while-revalidate=600"
+    : "no-store",
+);
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Schedule for Kill That Robot</title>
+
+    <link
+      rel="preload"
+      href="/fonts/DINPro-Bold.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/DINPro-Medium.otf"
+      as="font"
+      type="font/otf"
+      crossorigin
+    />
+  </head>
+
+  <body>
+    {
+      cards.length > 0 ? (
+        <section id="schedule" data-rotate={ROTATE_MS} data-reload={RELOAD_MS}>
+          {cards.map((card, index) => (
+            <article
+              class="segment"
+              data-index={index}
+              style={`background-image: url('${card.boxArt}');`}
+            >
+              <footer class="segment-footer">
+                <h1 class="segment-title">{card.title}</h1>
+                <h2 class="segment-category">{card.categoryName}</h2>
+                <div class="segment-meta">
+                  <p class="segment-weekday">{card.weekday}</p>
+                  <div class="segment-when">
+                    <p class="segment-time">{card.time}</p>
+                    <p class="segment-date">{card.date}</p>
+                  </div>
+                </div>
+              </footer>
+            </article>
+          ))}
+        </section>
+      ) : (
+        <p class="fallback">{errorMessage || "No schedule available."}</p>
+      )
     }
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      const scheduleContainer = document.getElementById('schedule-container');
-      
-      try {
-        const response = await fetch('/api/twitch-data');
+    <script is:inline>
+      (function () {
+        var schedule = document.getElementById("schedule");
+        if (!schedule) return;
 
-        if (!response.ok) {
-          throw new Error(`HTTP Error: ${response.status}`);
-        }
+        var segments = schedule.querySelectorAll(".segment");
+        if (!segments.length) return;
 
-        const data = await response.json();
+        var rotateMs = parseInt(schedule.dataset.rotate, 10) || 7500;
+        var reloadMs = parseInt(schedule.dataset.reload, 10) || 900000;
+        var current = 0;
 
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        const { schedule, categories } = data;
-
-        if (schedule && schedule.segments.length > 0 && scheduleContainer !== null ) {
-          scheduleContainer.innerHTML = `
-            <section
-              id="schedule"
-              class="w-[1024px] h-[450px] grid grid-cols-5 gap-2 transition-all duration-400"
-            >
-              ${schedule.segments.slice(0, 5).map((segment: Segment, index: number) => {
-                const category = categories.find((cat: Category) => cat.id === segment.category.id);
-                return `
-                  <article 
-                    id="segment-${index}"
-                    class="w-[1024/5px] h-full border-[#ff9931] border-solid border-4 relative"
-                    style="background-image: url(${category?.box_art_url}); background-position: center;"
-                  >
-                    <footer
-                      id="footer-${index}"
-                      class="bg-[#ff9931] text-white absolute bottom-0 p-3 flex flex-col justify-start gap-4 hidden"
-                    >
-                      <h1 class="m-0 p-0 leading-[0.8] font-dinpro-bold">${segment.title}</h1>
-                      <h2 class="m-0 p-0 leading-[0.8] font-dinpro-medium">${category?.name}</h2>
-                      <div class="w-full flex flex-row items-end mr-[-2px]" style="margin-left: -4px;">
-                        <p id="weekday-${index}" class="m-0 p-0 leading-[0.8] font-dinpro-bold text-[3.5rem]">
-                          ${removeAccents(new Date(segment.start_time).toLocaleString('es-ES', {
-                            weekday: 'long',
-                          }).toUpperCase().replace(/,/g, ''))}
-                        </p>
-                        <div class="m-0 p-0 flex flex-col space-y-0">
-                          <p class="m-0 p-0 leading-none font-dinpro-medium">
-                            ${new Date(segment.start_time).toLocaleString('es-ES', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: false,
-                            }).toUpperCase().replace(/,/g, '')}
-                          </p>
-                          <p class="m-0 p-0 leading-none font-dinpro-bold text-[28px]">
-                            ${new Date(segment.start_time).toLocaleString('de', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour12: false,
-                            }).toUpperCase().replace(/,/g, '')}
-                          </p>
-                        </div>
-                      </div>
-                    </footer>
-                  </article>
-                `;
-              }).join('')}
-            </section>
-          `;
-
-          setTimeout(() => {
-            let currentIndex = 0;
-
-            function updateSegment() {
-              const segments = document.querySelectorAll('#schedule article');
-              
-              segments.forEach((segment, index) => {
-                segment.classList.remove('selected'); 
-              });
-
-              if (segments[currentIndex]) {
-                segments[currentIndex].classList.add('selected');
-              }
-
-              currentIndex = (currentIndex + 1) % segments.length; 
-            }
-
-            updateSegment();
-
-            setInterval(updateSegment, 7500);
-          }, 100);
-        } else {
-          if (scheduleContainer !== null) {
-            scheduleContainer.innerHTML = '<p>No schedule available.</p>';
+        function select(index) {
+          for (var i = 0; i < segments.length; i++) {
+            var isActive = i === index;
+            // flex-grow interpola en cualquier Chromium; grid-template-columns
+            // solo a partir del 107. Por eso flexbox y no grid.
+            segments[i].style.flexGrow = isActive ? "3" : "1";
+            segments[i].classList.toggle("selected", isActive);
           }
         }
 
-      } catch (error) {
-          if (error instanceof Error) {
-            if (scheduleContainer !== null) {
-              scheduleContainer.innerHTML = `<p>Error loading data: ${error.message}</p>`;
-            } 
-          } else {
-            if (scheduleContainer !== null) {
-              scheduleContainer.innerHTML = `<p>Error loading data</p>`;
-            }
-          }
-      }
-    });
-  </script>
+        select(0);
 
+        setInterval(function () {
+          current = (current + 1) % segments.length;
+          select(current);
+        }, rotateMs);
+
+        // La fuente de OBS puede estar abierta días seguidos.
+        setTimeout(function () {
+          window.location.reload();
+        }, reloadMs);
+      })();
+    </script>
   </body>
 </html>
 
 <style>
-  :global(article) {
-    filter: grayscale(100%) opacity(24%);
-    transition: transform 0.4s ease-in-out;
+  /* Debe coincidir con el ancho/alto de la fuente de navegador en OBS. */
+  #schedule {
+    width: 1024px;
+    height: 450px;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
   }
 
-  :global(article.selected) {
+  .segment {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+    border: 4px solid #ff9331;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    filter: grayscale(100%) opacity(24%);
+    transition:
+      flex-grow 0.4s ease-in-out,
+      filter 0.4s ease-in-out;
+    will-change: flex-grow, filter;
+  }
+
+  .segment.selected {
     filter: none;
   }
 
-  :global(article.selected footer) {
-    display: block;
+  .segment-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    background-color: #ff9331;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* opacity + visibility en vez de display:none: display no transiciona. */
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.3s ease-in-out 0.15s,
+      visibility 0s linear 0.45s;
   }
 
-  :global(#schedule:has(#segment-0.selected)) {
-    grid-template-columns: 3fr 1fr 1fr 1fr 1fr;
+  .segment.selected .segment-footer {
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 0.3s ease-in-out 0.15s,
+      visibility 0s linear 0s;
   }
 
-  :global(#schedule:has(#segment-1.selected)) {
-    grid-template-columns: 1fr 3fr 1fr 1fr 1fr;
+  .segment-title,
+  .segment-category {
+    margin: 0;
+    padding: 0;
+    line-height: 0.9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  :global(#schedule:has(#segment-2.selected)) {
-    grid-template-columns: 1fr 1fr 3fr 1fr 1fr;
+  .segment-title {
+    font-family: "DINPro-Bold", sans-serif;
+    font-size: 1.25rem;
   }
 
-  :global(#schedule:has(#segment-3.selected)) {
-    grid-template-columns: 1fr 1fr 1fr 3fr 1fr;
+  .segment-category {
+    font-family: "DINPro-Medium", sans-serif;
+    font-size: 1rem;
   }
 
-  :global(#schedule:has(#segment-4.selected)) {
-    grid-template-columns: 1fr 1fr 1fr 1fr 3fr;
+  .segment-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .segment-weekday {
+    margin: 0;
+    padding: 0;
+    line-height: 0.8;
+    font-family: "DINPro-Bold", sans-serif;
+    font-size: 3.5rem;
+  }
+
+  .segment-when {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .segment-time,
+  .segment-date {
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .segment-time {
+    font-family: "DINPro-Medium", sans-serif;
+  }
+
+  .segment-date {
+    font-family: "DINPro-Bold", sans-serif;
+    font-size: 28px;
+  }
+
+  .fallback {
+    font-family: "DINPro-Medium", sans-serif;
+    color: #ffffff;
   }
 </style>

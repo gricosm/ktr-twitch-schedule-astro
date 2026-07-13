@@ -1,8 +1,10 @@
-import { defineConfig } from 'astro/config';
-
+// astro.config.mjs
+import { defineConfig } from "astro/config";
 import tailwind from "@astrojs/tailwind";
+import vercel from "@astrojs/vercel/serverless"; // en Astro 4 la ruta lleva /serverless
 
-// https://astro.build/config
 export default defineConfig({
-  integrations: [tailwind()]
+  output: "server",
+  adapter: vercel(),
+  integrations: [tailwind()],
 });
