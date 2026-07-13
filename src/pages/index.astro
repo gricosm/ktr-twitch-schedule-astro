@@ -104,6 +104,125 @@ Astro.response.headers.set(
       type="font/otf"
       crossorigin
     />
+    <style>
+      /* Debe coincidir con el ancho/alto de la fuente de navegador en OBS. */
+      #schedule {
+        width: 1024px;
+        height: 450px;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+      }
+
+      .segment {
+        position: relative;
+        flex: 1 1 0;
+        min-width: 0;
+        height: 100%;
+        border: 4px solid #ff9331;
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        filter: grayscale(100%) opacity(24%);
+        transition:
+          flex-grow 0.4s ease-in-out,
+          filter 0.4s ease-in-out;
+        will-change: flex-grow, filter;
+      }
+
+      .segment.selected {
+        filter: none;
+      }
+
+      .segment-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px;
+        background-color: #ff9331;
+        color: #ffffff;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        /* opacity + visibility en vez de display:none: display no transiciona. */
+        opacity: 0;
+        visibility: hidden;
+        transition:
+          opacity 0.3s ease-in-out 0.15s,
+          visibility 0s linear 0.45s;
+      }
+
+      .segment.selected .segment-footer {
+        opacity: 1;
+        visibility: visible;
+        transition:
+          opacity 0.3s ease-in-out 0.15s,
+          visibility 0s linear 0s;
+      }
+
+      .segment-title,
+      .segment-category {
+        margin: 0;
+        padding: 0;
+        line-height: 0.9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .segment-title {
+        font-family: "DINPro-Bold", sans-serif;
+        font-size: 1.25rem;
+      }
+
+      .segment-category {
+        font-family: "DINPro-Medium", sans-serif;
+        font-size: 1rem;
+      }
+
+      .segment-meta {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 8px;
+      }
+
+      .segment-weekday {
+        margin: 0;
+        padding: 0;
+        line-height: 0.8;
+        font-family: "DINPro-Bold", sans-serif;
+        font-size: 3.5rem;
+      }
+
+      .segment-when {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .segment-time,
+      .segment-date {
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .segment-time {
+        font-family: "DINPro-Medium", sans-serif;
+      }
+
+      .segment-date {
+        font-family: "DINPro-Bold", sans-serif;
+        font-size: 28px;
+      }
+
+      .fallback {
+        font-family: "DINPro-Medium", sans-serif;
+        color: #ffffff;
+      }
+    </style>
   </head>
 
   <body>
@@ -172,123 +291,3 @@ Astro.response.headers.set(
     </script>
   </body>
 </html>
-
-<style>
-  /* Debe coincidir con el ancho/alto de la fuente de navegador en OBS. */
-  #schedule {
-    width: 1024px;
-    height: 450px;
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-  }
-
-  .segment {
-    position: relative;
-    flex: 1 1 0;
-    min-width: 0;
-    height: 100%;
-    border: 4px solid #ff9331;
-    background-position: center;
-    background-size: cover;
-    background-repeat: no-repeat;
-    filter: grayscale(100%) opacity(24%);
-    transition:
-      flex-grow 0.4s ease-in-out,
-      filter 0.4s ease-in-out;
-    will-change: flex-grow, filter;
-  }
-
-  .segment.selected {
-    filter: none;
-  }
-
-  .segment-footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 12px;
-    background-color: #ff9331;
-    color: #ffffff;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    /* opacity + visibility en vez de display:none: display no transiciona. */
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity 0.3s ease-in-out 0.15s,
-      visibility 0s linear 0.45s;
-  }
-
-  .segment.selected .segment-footer {
-    opacity: 1;
-    visibility: visible;
-    transition:
-      opacity 0.3s ease-in-out 0.15s,
-      visibility 0s linear 0s;
-  }
-
-  .segment-title,
-  .segment-category {
-    margin: 0;
-    padding: 0;
-    line-height: 0.9;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .segment-title {
-    font-family: "DINPro-Bold", sans-serif;
-    font-size: 1.25rem;
-  }
-
-  .segment-category {
-    font-family: "DINPro-Medium", sans-serif;
-    font-size: 1rem;
-  }
-
-  .segment-meta {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    gap: 8px;
-  }
-
-  .segment-weekday {
-    margin: 0;
-    padding: 0;
-    line-height: 0.8;
-    font-family: "DINPro-Bold", sans-serif;
-    font-size: 3.5rem;
-  }
-
-  .segment-when {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .segment-time,
-  .segment-date {
-    margin: 0;
-    padding: 0;
-    line-height: 1;
-  }
-
-  .segment-time {
-    font-family: "DINPro-Medium", sans-serif;
-  }
-
-  .segment-date {
-    font-family: "DINPro-Bold", sans-serif;
-    font-size: 28px;
-  }
-
-  .fallback {
-    font-family: "DINPro-Medium", sans-serif;
-    color: #ffffff;
-  }
-</style>

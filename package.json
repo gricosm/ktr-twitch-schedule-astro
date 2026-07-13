@@ -10,11 +10,9 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/check": "0.9.3",
-    "@astrojs/tailwind": "5.1.1",
+    "@astrojs/check": "0.9.9",
     "@astrojs/vercel": "^11.0.2",
-    "astro": "4.15.7",
-    "tailwindcss": "^3.4.12",
+    "astro": "7.0.7",
     "typescript": "^5.6.2"
   }
 }
