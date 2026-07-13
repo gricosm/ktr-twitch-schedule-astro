@@ -7,14 +7,14 @@ import {
 import type { Segment, Category } from "../types/twitchTypes";
 import "../styles/global.css";
 
-// Requiere adapter (@astrojs/vercel) + output: "server" en astro.config.mjs
+// Requires an adapter (@astrojs/vercel) + output: "server" in astro.config.mjs
 export const prerender = false;
 
 const CHANNEL = "killthatrobot";
 const TIME_ZONE = "Europe/Madrid";
 const MAX_SEGMENTS = 5;
 
-// Rotación de la tarjeta activa y refresco automático de la página.
+// Active card rotation interval and automatic page refresh interval.
 const ROTATE_MS = 7500;
 const RELOAD_MS = 15 * 60 * 1000;
 
@@ -30,7 +30,7 @@ interface Card {
 const stripAccents = (str: string): string =>
   str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Node tiene ICU completo: formateamos aquí, no en el navegador de OBS.
+// Node ships full ICU, so we format here rather than in OBS's browser.
 const fmt = (d: Date, opts: Intl.DateTimeFormatOptions, locale = "es-ES") =>
   new Intl.DateTimeFormat(locale, { timeZone: TIME_ZONE, ...opts }).format(d);
 
@@ -39,7 +39,7 @@ let errorMessage = "";
 
 try {
   const broadcasterId = await getBroadcasterIdByName(CHANNEL);
-  if (!broadcasterId) throw new Error("Canal no encontrado");
+  if (!broadcasterId) throw new Error("Broadcaster not found");
 
   const scheduleResponse = await getTwitchSchedule(broadcasterId);
   const segments: Segment[] = (scheduleResponse.data?.segments ?? []).slice(
@@ -71,11 +71,11 @@ try {
   }
 } catch (error) {
   errorMessage =
-    error instanceof Error ? error.message : "Error cargando el calendario";
+    error instanceof Error ? error.message : "Error loading the schedule";
   console.error("[schedule]", error);
 }
 
-// No cachear los fallos: si Twitch peta, no lo dejamos congelado en el CDN.
+// Never cache failures: if Twitch is down, don't freeze the error in the CDN.
 Astro.response.headers.set(
   "Cache-Control",
   cards.length > 0
@@ -105,7 +105,7 @@ Astro.response.headers.set(
       crossorigin
     />
     <style>
-      /* Debe coincidir con el ancho/alto de la fuente de navegador en OBS. */
+      /* Must match the width/height of the OBS browser source. */
       #schedule {
         width: 1024px;
         height: 450px;
@@ -146,7 +146,7 @@ Astro.response.headers.set(
         display: flex;
         flex-direction: column;
         gap: 8px;
-        /* opacity + visibility en vez de display:none: display no transiciona. */
+        /* opacity + visibility instead of display:none: display cannot transition. */
         opacity: 0;
         visibility: hidden;
         transition:
@@ -269,8 +269,8 @@ Astro.response.headers.set(
         function select(index) {
           for (var i = 0; i < segments.length; i++) {
             var isActive = i === index;
-            // flex-grow interpola en cualquier Chromium; grid-template-columns
-            // solo a partir del 107. Por eso flexbox y no grid.
+            // flex-grow interpolates in every Chromium; grid-template-columns
+            // only does so from 107 onwards. Hence flexbox instead of grid.
             segments[i].style.flexGrow = isActive ? "3" : "1";
             segments[i].classList.toggle("selected", isActive);
           }
@@ -283,7 +283,7 @@ Astro.response.headers.set(
           select(current);
         }, rotateMs);
 
-        // La fuente de OBS puede estar abierta días seguidos.
+        // The OBS source can stay open for days on end.
         setTimeout(function () {
           window.location.reload();
         }, reloadMs);
